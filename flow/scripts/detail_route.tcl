@@ -8,7 +8,63 @@ if {![grt::have_routes]} {
 erase_non_stage_variables route
 set_propagated_clock [all_clocks]
 
+# Generate custom weights for this design run
+set weight_file ""
 set additional_args ""
+
+# Get absolute path to OpenROAD tools directory
+set flow_dir [file normalize [file dirname [info script]]]
+set root_dir [file normalize [file join $flow_dir ../]]
+set scripts_dir [file normalize [file join $root_dir tools OpenROAD src drt src dr scripts]]
+
+puts "=== Weight Generation Debug ==="
+puts "Current directory: [pwd]"
+puts "Flow directory: $flow_dir"
+puts "Root directory: $root_dir"
+puts "Scripts directory: $scripts_dir"
+puts "Scripts directory exists: [file exists $scripts_dir]"
+puts "Scripts directory readable: [file readable $scripts_dir]"
+
+# Ensure scripts directory exists and is readable
+if {[file exists $scripts_dir] && [file readable $scripts_dir]} {
+    # Generate weights in OpenROAD scripts directory
+    set weight_path [file normalize [file join $scripts_dir "strategy_costweights.csv"]]
+    
+    puts "Scripts directory: $scripts_dir"
+    puts "Weight path: $weight_path"
+    puts "Python script exists: [file exists [file join $scripts_dir weight_generator.py]]"
+    
+    if {[catch {
+        puts "Attempting to run Python script..."
+        set python_output [exec python3 $scripts_dir/weight_generator.py $weight_path]
+        puts "Python script output:"
+        puts $python_output
+        
+        # Check if file exists and has content
+        if {[file exists $weight_path]} {
+            puts "Weight file exists, size: [file size $weight_path]"
+            set weight_file $weight_path
+            puts "Generated custom routing weights at $weight_file"
+        } else {
+            puts "Error: Weight file was not created at $weight_path"
+        }
+    } result]} {
+        puts "Warning: Failed to generate custom weights:"
+        puts "Error message: $result"
+        if {[file exists $weight_path] && [file readable $weight_path]} {
+            set weight_file $weight_path
+            puts "Using existing weights from $weight_file"
+        }
+    }
+}
+
+if {$weight_file ne ""} {
+    puts "Final weight file path: $weight_file"
+    append additional_args " -weight_file $weight_file"
+} else {
+    puts "Warning: No weight file was set"
+}
+
 append_env_var additional_args dbProcessNode -db_process_node 1
 append_env_var additional_args OR_SEED -or_seed 1
 append_env_var additional_args OR_K -or_k 1

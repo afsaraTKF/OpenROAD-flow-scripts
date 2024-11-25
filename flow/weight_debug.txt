@@ -1,0 +1,9 @@
+Script executed at: 2024-11-25 15:08:18.437855
+Current directory: /home/afsara/OpenROAD-flow-scripts/flow
+Generated 65 weights
+First few weights:
+(1, 0, 1, 1.0)
+(1, 0, 1, 1.0)
+(1, 0, 1, 1.0)
+(1, 0, 2, 1.0)
+(1, 1, 2, 1.0)

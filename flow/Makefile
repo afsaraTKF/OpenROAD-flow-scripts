@@ -102,7 +102,7 @@
 #DESIGN_CONFIG=./designs/ihp-sg13g2/riscv32i/config.mk
 
 # Default design
-DESIGN_CONFIG ?= ./designs/nangate45/gcd/config.mk
+#DESIGN_CONFIG ?= ./designs/nangate45/gcd/config.mk
 
 # Include design and platform configuration before setting default options
 # in this file. This allows the DESIGN_CONFIG to set different defaults than
@@ -129,7 +129,7 @@ MAKEFLAGS += --no-builtin-rules
 
 #-------------------------------------------------------------------------------
 # Default target when invoking without specific target.
-.DEFAULT_GOAL := finish
+.DEFAULT_GOAL := all
 
 #-------------------------------------------------------------------------------
 # Proper way to initiate SHELL for make
@@ -193,12 +193,79 @@ export FLOW_VARIANT ?= base
 # Setup working directories
 export DESIGN_NICKNAME ?= $(DESIGN_NAME)
 
+DESIGN_PATH := $(PLATFORM)/$(DESIGN_NICKNAME)/$(FLOW_VARIANT)
+export DESIGN_PATH
+# Set up different directories for each run (for parallel runs)
+
+# number of existing runs
+RESULTS_BASE = $(WORK_HOME)/results/$(DESIGN_PATH)
+
+# Define which targets should increment run ID - only full flow targets
+FLOW_TARGETS := all finish
+
+# Get next run number by looking at existing run directories
+# If no runs exist, start at 1
+# Otherwise, find highest run number and increment
+define get_next_run_number
+$(shell if [ ! -d "$(RESULTS_BASE)" ] || [ -z "$$(ls -A $(RESULTS_BASE) 2>/dev/null)" ]; then \
+    echo 1; \
+else \
+    num=$$(ls -1d $(RESULTS_BASE)/run_* 2>/dev/null | sed 's/.*run_//' | sort -n | tail -1); \
+    if [ -z "$$num" ]; then echo 1; else echo $$((num + 1)); fi; \
+fi)
+endef
+
+# Get current run number (without incrementing)
+define get_current_run_number
+$(shell if [ ! -d "$(RESULTS_BASE)" ] || [ -z "$$(ls -A $(RESULTS_BASE) 2>/dev/null)" ]; then \
+    echo 1; \
+else \
+    num=$$(ls -1d $(RESULTS_BASE)/run_* 2>/dev/null | sed 's/.*run_//' | sort -n | tail -1); \
+    if [ -z "$$num" ]; then echo 1; else echo $$num; fi; \
+fi)
+endef
+
+
+
+
+
+# Set OR_RUN_ID based on target
+ifeq ($(MAKECMDGOALS),)
+# Default 'make' - increment run
+OR_RUN_ID := run_$(call get_next_run_number)
+else
+ifeq ($(filter $(FLOW_TARGETS),$(MAKECMDGOALS)),)
+# Partial targets - use current run
+OR_RUN_ID := run_$(call get_current_run_number)
+else
+# Full flow targets - increment run
+OR_RUN_ID := run_$(call get_next_run_number)
+endif
+endif
+
+# Export for sub-makes
+export OR_RUN_ID
+
 export DESIGN_CONFIG
 export DESIGN_DIR  = $(dir $(DESIGN_CONFIG))
-export LOG_DIR     = $(WORK_HOME)/logs/$(PLATFORM)/$(DESIGN_NICKNAME)/$(FLOW_VARIANT)
-export OBJECTS_DIR = $(WORK_HOME)/objects/$(PLATFORM)/$(DESIGN_NICKNAME)/$(FLOW_VARIANT)
-export REPORTS_DIR = $(WORK_HOME)/reports/$(PLATFORM)/$(DESIGN_NICKNAME)/$(FLOW_VARIANT)
-export RESULTS_DIR = $(WORK_HOME)/results/$(PLATFORM)/$(DESIGN_NICKNAME)/$(FLOW_VARIANT)
+export LOG_DIR     = $(WORK_HOME)/logs/$(DESIGN_PATH)/$(OR_RUN_ID)
+export OBJECTS_DIR = $(WORK_HOME)/objects/$(DESIGN_PATH)/$(OR_RUN_ID)
+export REPORTS_DIR = $(WORK_HOME)/reports/$(DESIGN_PATH)/$(OR_RUN_ID)
+export RESULTS_DIR = $(WORK_HOME)/results/$(DESIGN_PATH)/$(OR_RUN_ID)
+
+# allow multiple autonomous runs for data collection
+.PHONY: run_loop
+run_loop:
+	@if [ -z "$(LOOPS)" ]; then \
+		echo "Please specify number of loops with LOOPS=N"; \
+		exit 1; \
+	fi
+	@echo "Running flow $(LOOPS) times for $(DESIGN_NICKNAME)..."
+	@for i in $$(seq 1 $(LOOPS)); do \
+		echo "Starting flow $$i of $(LOOPS)..."; \
+		$(MAKE) all || exit 1; \
+		echo "Completed flow $$i"; \
+	done 
 
 ifneq ($(BLOCKS),)
   $(foreach block,$(BLOCKS),$(eval BLOCK_LEFS += ./results/$(PLATFORM)/$(DESIGN_NICKNAME)_$(block)/$(FLOW_VARIANT)/${block}.lef))

@@ -321,8 +321,7 @@ endif
 # Priority is given to
 #       1 user explicit set with variable in Makefile or command line, for instance setting OPENROAD_EXE
 #       2 ORFS compiled tools: openroad, yosys
-# export OPENROAD_EXE      ?= $(abspath $(FLOW_HOME)/../tools/install/OpenROAD/bin/openroad)
-export OPENROAD_EXE = $(abspath $(FLOW_HOME)/../tools/OpenROAD/build_exp/src/openroad)
+export OPENROAD_EXE = $(abspath $(FLOW_HOME)/../tools/install/OpenROAD/bin/openroad)
 export OPENSTA_EXE       ?= $(abspath $(FLOW_HOME)/../tools/install/OpenROAD/bin/sta)
 
 OPENROAD_ARGS            = -no_init -threads $(NUM_CORES) $(OR_ARGS)
@@ -340,7 +339,10 @@ ifeq ($(wildcard $(KLAYOUT_BIN_FROM_DIR)), $(KLAYOUT_BIN_FROM_DIR))
 KLAYOUT_CMD ?= sh -c 'LD_LIBRARY_PATH=$(dir $(KLAYOUT_BIN_FROM_DIR)) $$0 "$$@"' $(KLAYOUT_BIN_FROM_DIR)
 else
 ifeq ($(KLAYOUT_CMD),)
-KLAYOUT_CMD := $(shell command -v klayout)
+KLAYOUT_CMD := $(HOME)/local/bin/klayout_shell
+ifeq ($(KLAYOUT_CMD),)
+KLAYOUT_CMD := $(HOME)/local/bin/klayout
+endif
 endif
 endif
 KLAYOUT_FOUND            = $(if $(KLAYOUT_CMD),,$(error KLayout not found in PATH))
@@ -419,7 +421,6 @@ versions.txt:
 
 # Pre-process libraries
 # ==============================================================================
-
 # Create temporary Liberty files which have the proper dont_use properties set
 # For use with Yosys and ABC
 .SECONDEXPANSION:

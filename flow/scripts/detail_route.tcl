@@ -22,13 +22,33 @@ puts "Scripts directory: $scripts_dir"
 puts "Scripts directory exists: [file exists $scripts_dir]"
 puts "Scripts directory readable: [file readable $scripts_dir]"
 
-# Always generate new weights
-set weights_file [file normalize [file join $flow_dir "weights.csv"]]
-puts "Generating new weights..."
+# Create design-specific weights directory if it doesn't exist
+set weights_dir [file normalize [file join $flow_dir "weights"]]
+if {![file exists $weights_dir]} {
+    file mkdir $weights_dir
+}
+
+# Get the current design name from environment or db
+set design_name ""
+if {[info exists ::env(DESIGN_NAME)]} {
+    set design_name $::env(DESIGN_NAME)
+} else {
+    # Try to get the design name from the loaded database
+    set design_name [get_db designs]
+}
+
+if {$design_name == ""} {
+    puts "Warning: Could not determine design name, using default"
+    set design_name "default"
+}
+
+# Always generate new design-specific weights
+set weights_file [file normalize [file join $weights_dir "weights_${design_name}.csv"]]
+puts "Generating new design-specific weights for $design_name..."
 
 if {[catch {
     puts "Running weight generator script..."
-    set python_output [exec python3 $scripts_dir/weight_generator.py $weights_file]
+    set python_output [exec python3.9 $scripts_dir/weight_generator.py $weights_file --design $design_name]
     puts "Python script output:"
     puts $python_output
     
